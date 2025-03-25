@@ -30,10 +30,16 @@ def get_flags(flags):
   byte2 = bytes(flags[1:2])
   response_flags = ''
   QR = '1' # value 1 means its a response and 0 means its a query
-
   # 1 in bits = 00000001
   # byte1 in bits = 0_0000_0_1_0
-  OPCODE = ''.join(str(ord(byte1)&(1<<bit)) for bit in range(3,7))
+  OPCODE = ''.join(str(ord(byte1)&(1<<bit)) for bit in range(2,6))
+  AA = '1' # Authoritative Answer
+  TC = '0' # Truncated
+  RD = '0' # Recursion Desired
+  RA = '0' # Recursion Available
+  Z = '000' # Reserved
+  RCODE = '0000' # Response Code
+  return int(QR+OPCODE+AA+TC+RD, 2).to_bytes(1, byteorder='big')+int(RA+Z+RCODE, 2).to_bytes(1, byteorder='big')
 
 #     The header contains the following fields:
 #                                     1  1  1  1  1  1
@@ -71,9 +77,9 @@ def build_response(data):
   transaction_id = data[0:2]
   response_TID = ''.join(hex(byte)[2:] for byte in transaction_id)
   flags = get_flags(data[2:4])
+  print('flags: ', flags)
 
 while True:
   data, addr = sock.recvfrom(512) # Check rfc1035.txt for details, 512 Bytes
-  print('data: ', data)
   response = build_response(data)
   sock.sendto(response, addr)
