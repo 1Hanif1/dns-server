@@ -11,6 +11,45 @@ local_host = '127.0.0.1'
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock.bind((local_host, port))
 
+# def get_domain(data):
+#   print(data)
+#   state = 0
+#   expected_length = 0
+#   domain_string = ''
+#   domain_parts = []
+#   current_length = 0
+#   for byte in data:
+#     if state == 1:
+#       current_length += 1
+#       domain_string += chr(byte) # Convert Byte to ASCII
+#       if current_length == expected_length:
+#         current_length = 0
+#         domain_parts.append(domain_string)
+#         domain_string = ''
+#         state = 0
+#         current_length = 0
+#       if byte == 0:
+#         domain_parts.append(domain_string)
+      
+#     else:
+#       state = 1
+#       expected_length = byte
+#     print(domain_string)
+
+def get_domain(data):
+    domain_parts = []
+    offset = 12  # Start of question section
+    
+    while True:
+        length = data[offset]
+        if length == 0:
+            break
+        offset += 1
+        domain_parts.append(data[offset:offset+length].decode('ascii'))
+        offset += length
+    print(domain_parts)
+    return '.'.join(domain_parts)
+
 # Flags: 0x0100 Standard query
 #     0... .... .... .... = Response: Message is a query
 #     .000 0... .... .... = Opcode: Standard query (0)
@@ -77,6 +116,10 @@ def build_response(data):
   transaction_id = data[0:2]
   response_TID = ''.join(hex(byte)[2:] for byte in transaction_id)
   flags = get_flags(data[2:4])
+  QDCOUNT = b'\x00\x01' # 2 Bytes
+  # ANCOUNT = b'\x00\x01' # 2 Bytes
+  get_domain(data) # 12 Bytes is the start of the domain name
+  # NSCOUNT = b'\x00\x00' # 2 Bytes
   print('flags: ', flags)
 
 while True:
