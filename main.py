@@ -1,4 +1,4 @@
-import socket
+import socket, glob, json
 
 # Default DNS port is 53
 port = 53
@@ -11,30 +11,17 @@ local_host = '127.0.0.1'
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock.bind((local_host, port))
 
-# def get_domain(data):
-#   print(data)
-#   state = 0
-#   expected_length = 0
-#   domain_string = ''
-#   domain_parts = []
-#   current_length = 0
-#   for byte in data:
-#     if state == 1:
-#       current_length += 1
-#       domain_string += chr(byte) # Convert Byte to ASCII
-#       if current_length == expected_length:
-#         current_length = 0
-#         domain_parts.append(domain_string)
-#         domain_string = ''
-#         state = 0
-#         current_length = 0
-#       if byte == 0:
-#         domain_parts.append(domain_string)
-      
-#     else:
-#       state = 1
-#       expected_length = byte
-#     print(domain_string)
+def load_zones():
+  json_zone = {}
+  zone_files = glob.glob('zones/*.zone')
+  for zone in zone_files:
+     with open(zone) as zone_data:
+        data = json.load(zone_data)
+        zone_name = data['$origin']
+        json_zone[zone_name] = data
+  return json_zone
+ 
+zone_data = load_zones()
 
 def get_domain(data):
     domain_parts = []
@@ -47,7 +34,24 @@ def get_domain(data):
         offset += 1
         domain_parts.append(data[offset:offset+length].decode('ascii'))
         offset += length
-    return '.'.join(domain_parts)
+
+    question_type = data[offset+1:offset+3]  # Question type (2 bytes)
+    return (domain_parts, question_type)
+
+def get_zone(domain_parts):
+  global zone_data
+  zone_name = '.'.join(domain_parts)+"."
+  return zone_data[zone_name] if zone_name in zone_data else None
+
+
+def get_records(data):
+  domain_parts, question_type = get_domain(data)
+  QT = ''
+  if question_type == b'\x00\x01':
+    QT = 'a' # Query Type
+
+  zone = get_zone(domain_parts)
+  return (zone[QT], QT, domain_parts)
 
 # Flags: 0x0100 Standard query
 #     0... .... .... .... = Response: Message is a query
@@ -117,9 +121,11 @@ def build_response(data):
   flags = get_flags(data[2:4])
   QDCOUNT = b'\x00\x01' # 2 Bytes
   # ANCOUNT = b'\x00\x01' # 2 Bytes
-  get_domain(data) # 12 Bytes is the start of the domain name
+  # get_domain(data) # 12 Bytes is the start of the domain name
   # NSCOUNT = b'\x00\x00' # 2 Bytes
-  print('flags: ', flags)
+  records = get_records(data)
+  A_RECORDS = records[0]
+  print(len(A_RECORDS))
 
 while True:
   data, addr = sock.recvfrom(512) # Check rfc1035.txt for details, 512 Bytes
