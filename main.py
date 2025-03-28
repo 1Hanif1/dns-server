@@ -53,6 +53,11 @@ def get_records(data):
   zone = get_zone(domain_parts)
   return (zone[QT], QT, domain_parts)
 
+def record_to_bytes(domain_parts, record_type, record_ttl, record_value):
+  # Convert the record to bytes
+  record_bytes = b''
+
+
 # Flags: 0x0100 Standard query
 #     0... .... .... .... = Response: Message is a query
 #     .000 0... .... .... = Opcode: Standard query (0)
@@ -82,6 +87,20 @@ def get_flags(flags):
   Z = '000' # Reserved
   RCODE = '0000' # Response Code
   return int(QR+OPCODE+AA+TC+RD, 2).to_bytes(1, byteorder='big')+int(RA+Z+RCODE, 2).to_bytes(1, byteorder='big')
+
+def build_question(domain_parts, record_type):
+  QBYTES = b''
+  for part in domain_parts:
+    part_bytes = bytes([len(part)]) + part.encode('ascii')
+    QBYTES += part_bytes
+  QBYTES += b'\x00' # End of domain name
+  
+  if record_type == 'a':
+      QBYTES += b'\x00\x01' # Type A (Host Address)
+  
+  QBYTES += b'\x00\x01' # Class IN (Internet)
+  return QBYTES
+  
 
 #     The header contains the following fields:
 #                                     1  1  1  1  1  1
@@ -116,16 +135,29 @@ def get_flags(flags):
 #     Queries
 def build_response(data):
   # Add the transaction/Packet ID to response (First 2 Bytes)
-  transaction_id = data[0:2]
-  response_TID = ''.join(hex(byte)[2:] for byte in transaction_id)
-  flags = get_flags(data[2:4])
+  PACKET_ID = data[0:2]
+  # response_TID = ''.join(hex(byte)[2:] for byte in transaction_id)
+  FLAGS = get_flags(data[2:4])
+  # Question Count
   QDCOUNT = b'\x00\x01' # 2 Bytes
-  # ANCOUNT = b'\x00\x01' # 2 Bytes
   # get_domain(data) # 12 Bytes is the start of the domain name
-  # NSCOUNT = b'\x00\x00' # 2 Bytes
-  records = get_records(data)
+  records, record_type, domain_parts = get_records(data)
   A_RECORDS = records[0]
-  print(len(A_RECORDS))
+  # Answer Count
+  ANCOUNT = len(A_RECORDS).to_bytes(2, byteorder='big')
+  # Nameserver Count
+  NSCOUNT = b'\x00\x00' # 2 Bytes
+  # Additional Count
+  ARCOUNT = b'\x00\x00' # 2 Bytes
+  DNS_HEADER = PACKET_ID + FLAGS + QDCOUNT + ANCOUNT + NSCOUNT + ARCOUNT
+
+  DNS_BODY = b''
+  DNS_QUESTION = build_question(domain_parts, record_type)
+  
+  for record in records:
+    DNS_BODY += record_to_bytes(domain_parts, record_type, record['ttl', record['value']])
+  print(DNS_QUESTION)
+
 
 while True:
   data, addr = sock.recvfrom(512) # Check rfc1035.txt for details, 512 Bytes
