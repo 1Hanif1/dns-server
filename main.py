@@ -47,7 +47,6 @@ def get_domain(data):
         offset += 1
         domain_parts.append(data[offset:offset+length].decode('ascii'))
         offset += length
-    print(domain_parts)
     return '.'.join(domain_parts)
 
 # Flags: 0x0100 Standard query
